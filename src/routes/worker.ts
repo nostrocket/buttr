@@ -4,6 +4,7 @@ import NDKSvelte, {
   type NDKEventStore,
 } from "@nostr-dev-kit/ndk-svelte";
 import { get, writable } from "svelte/store";
+import { ResponseData, type Command } from "./worker.types";
 
 const _ndk = writable(
   new NDKSvelte({
@@ -35,7 +36,7 @@ let start = (pubkey: string) => {
   console.log(pubkey);
   ndk.connect(5000).then(() => {
     sub = ndk.storeSubscribe({ authors: [pubkey] }, { subId: "kind-1" });
-    let response = new Response();
+    let response = new ResponseData;
     sub.subscribe((x) => {
       for (let y of x) {
         if (!set.has(y.id)) {
@@ -73,21 +74,3 @@ onmessage = (m: MessageEvent<Command>) => {
   }
   //const transformedData = doSomeHeavyWork(data);
 };
-
-export type Command = {
-  command: "start" | "stop" | "print";
-  pubkey: string;
-};
-
-export class Response {
-  count: number;
-  connections: Map<string, number>;
-  constructor() {
-    this.count = 0;
-    this.connections = new Map();
-  }
-}
-//   export type Response = {
-//     count: number
-//     connections: Map<string, number>
-//   }
