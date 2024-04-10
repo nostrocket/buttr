@@ -1,6 +1,7 @@
 <script lang="ts">
   import { writable } from "svelte/store";
-  import { ResponseData, type Command } from "./worker.types";
+  import { ResponseData, Command } from "./worker.types";
+  import { npubToHex } from "./helpers";
 
   const responseFromWorker = writable(new ResponseData());
   let myWorker: Worker | undefined = undefined;
@@ -28,6 +29,8 @@
   let connect: Command = {
     command: "connect",
   };
+
+  let rootPubkey = "d91191e30e00444b942c0e82cad470b32af171764c2275bee0bd99377efd4075"
 </script>
 
 <button on:click={setup}>Start Web Worker</button>
@@ -37,11 +40,18 @@ on:click={() => {
   myWorker?.postMessage(connect);
 }}>{#if $responseFromWorker.connected == 0}ndk.connect{:else if $responseFromWorker.connected == 1 }connecting {:else}connected{/if}</button
 >
+<br />pubkey:<input bind:value={rootPubkey} size={72} maxlength={64}>
   <button
     on:click={() => {
-      myWorker?.postMessage(start);
+      try {
+        rootPubkey = npubToHex(rootPubkey)
+      } catch {
+        alert("invalid pubkey"); 
+        return
+      }
+      myWorker?.postMessage(new Command("start", rootPubkey));
     }}>ndk.storeSubscribe</button
-  >
+  ><br />
   <button
     on:click={() => {
       myWorker?.postMessage({ command: "stop" });
@@ -57,7 +67,8 @@ on:click={() => {
 <br />
 {#if $responseFromWorker.connected == 2}Relays are connected{:else if $responseFromWorker.connected == 1}Trying to connect to relays{:else}Not connected to any relays{/if}
 <h4>Total events from all relays: {$responseFromWorker.rawCount}</h4>
-<h4>UNIQUE EVENTS: {$responseFromWorker.eventIds.size}</h4>
+<h4>UNIQUE EVENTS: {$responseFromWorker.events.size}</h4>
+<h4>UNIQUE MAP: {$responseFromWorker.events.size}</h4>
 
 <h4>RELAY CONNECTIONS</h4>
 {#each $responseFromWorker.connections as [relay, subs], i (relay)}<h6>{relay} {subs}</h6> {/each}

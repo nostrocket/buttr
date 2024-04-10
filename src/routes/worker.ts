@@ -1,4 +1,4 @@
-import type { NDKEvent } from "@nostr-dev-kit/ndk";
+import type { NDKEvent, NDKFilter } from "@nostr-dev-kit/ndk";
 import NDKSvelte, {
   type ExtendedBaseType,
   type NDKEventStore,
@@ -9,7 +9,7 @@ import NDKCacheAdapterDexie from "@nostr-dev-kit/ndk-cache-dexie";
 
 const _ndk = writable(
   new NDKSvelte({
-    cacheAdapter: new NDKCacheAdapterDexie({ dbName: "wiki" }),
+    //cacheAdapter: new NDKCacheAdapterDexie({ dbName: "wiki" }),
     explicitRelayUrls: [
       "wss://purplepag.es",
       "wss://relay.nostr.band",
@@ -31,8 +31,9 @@ const _ndk = writable(
 const ndk = get(_ndk);
 let sub: NDKEventStore<ExtendedBaseType<NDKEvent>> | undefined = undefined;
 
-const set = new Set<string>();
-let responseStore = writable(new ResponseData());
+const responseData = new ResponseData();
+
+let responseStore = writable(responseData);
 responseStore.subscribe((response) => {
   postMessage(response);
 });
@@ -43,27 +44,39 @@ let start = (pubkey: string) => {
       current.errors.push(new Error("not connected!"));
       return current;
     });
+    return;
   }
-  sub = ndk.storeSubscribe({ authors: [pubkey] }, { subId: "kind-1" }); //authors: [pubkey]
-  sub.subscribe((x) => {
-    for (let y of x) {
-      if (!set.has(y.id)) {
-        set.add(y.id);
+  if (!sub) {
+    sub = ndk.storeSubscribe({ authors: [pubkey] }, { subId: "kind-1" });
+    sub.subscribe((x) => {
+      for (let y of x) {
+        if (!responseData.events.has(y.id)) {
+          responseData.events.set(y.id, y.rawEvent());
         }
-    }
-    responseStore.update((current) => {
-        current.rawCount = x.length
-        current.eventIds = set
-      if (sub?.subscription) {
-        for (let [s, relay] of sub.subscription.pool.relays) {
-          current.connections.set(s, relay.activeSubscriptions().size);
-        }
-      } else {
-        current.connections = new Map();
       }
-      return current;
+      responseStore.update((current) => {
+        current.rawCount = x.length;
+        if (sub?.subscription) {
+          for (let [s, relay] of sub.subscription.pool.relays) {
+            current.connections.set(s, relay.activeSubscriptions().size);
+          }
+        } else {
+          current.connections = new Map();
+        }
+        return current;
+      });
     });
-  });
+  } else {
+    let newFilters: NDKFilter[] = [];
+    if (sub.filters) {
+      newFilters.push(...sub.filters);
+    }
+    newFilters.push({ authors: [pubkey] });
+    sub.changeFilters(newFilters);
+    console.log(sub.filters);
+    sub.unsubscribe();
+    sub.startSubscription();
+  }
 };
 
 onmessage = (m: MessageEvent<Command>) => {
