@@ -5,10 +5,11 @@ import NDKSvelte, {
 } from "@nostr-dev-kit/ndk-svelte";
 import { get, writable } from "svelte/store";
 import { ResponseData, type Command } from "./worker.types";
+import NDKCacheAdapterDexie from "@nostr-dev-kit/ndk-cache-dexie";
 
 const _ndk = writable(
   new NDKSvelte({
-    //cacheAdapter: new NDKCacheAdapterDexie({ dbName: 'wiki' }),
+    cacheAdapter: new NDKCacheAdapterDexie({ dbName: "wiki" }),
     explicitRelayUrls: [
       "wss://purplepag.es",
       "wss://relay.nostr.band",
@@ -31,33 +32,69 @@ const ndk = get(_ndk);
 let sub: NDKEventStore<ExtendedBaseType<NDKEvent>> | undefined = undefined;
 
 const set = new Set();
+let responseStore = writable(new ResponseData());
+responseStore.subscribe((response) => {
+    postMessage(response);
+  });
+
+let connected = false;
 
 let start = (pubkey: string) => {
-  console.log(pubkey);
-  ndk.connect(5000).then(() => {
-    sub = ndk.storeSubscribe({ authors: [pubkey] }, { subId: "kind-1" });
-    let response = new ResponseData;
-    sub.subscribe((x) => {
-      for (let y of x) {
-        if (!set.has(y.id)) {
-          set.add(y.id);
-        }
+if (!connected) {
+    responseStore.update(current=>{
+        current.errors.push(new Error("not connected!"))
+        return current
+    })
+}
+  sub = ndk.storeSubscribe({ authors: [pubkey] }, { subId: "kind-1" });
+  sub.subscribe((x) => {
+    for (let y of x) {
+      if (!set.has(y.id)) {
+        set.add(y.id);
       }
-      response.count = set.size;
-      if (sub) {
-        for (let [s, relay] of sub.subscription!.pool.relays) {
-          response.connections.set(s, relay.activeSubscriptions().size);
-        }
-      }
-      postMessage(response);
+    }
+    responseStore.update((current) => {
+      current.count = set.size;
+      return current;
     });
+    if (sub) {
+      responseStore.update((current) => {
+        if (sub?.subscription) {
+          for (let [s, relay] of sub.subscription.pool.relays) {
+            current.connections.set(s, relay.activeSubscriptions().size);
+          }
+        } else {
+          current.connections = new Map();
+        }
+        return current;
+      });
+    }
   });
 };
 
 onmessage = (m: MessageEvent<Command>) => {
-  //const { data } = event;
+  if (m.data.command == "connect") {
+    if (get(responseStore).connected == 0) {
+        responseStore.update(current=>{
+            current.connected = 1;
+            return current;
+        })
+        ndk.connect(5000).then(() => {
+            responseStore.update(current=>{
+                current.connected = 2;
+                return current;
+            })
+        });
+    } else {
+        responseStore.update(current=>{
+            current.errors.push(Error("already connected!"))
+            return current
+        })
+    }
+  }
+
   if (m.data.command == "start") {
-    start(m.data.pubkey);
+    if (m.data.pubkey) {start(m.data.pubkey)}
   }
   if (m.data.command == "stop") {
     if (sub) {
@@ -72,5 +109,4 @@ onmessage = (m: MessageEvent<Command>) => {
       }
     }
   }
-  //const transformedData = doSomeHeavyWork(data);
 };

@@ -3,7 +3,7 @@
   import { ResponseData, type Command } from "./worker.types";
 
   const numberOfEvents = writable(new ResponseData());
-  let myWorker: Worker;
+  let myWorker: Worker | undefined = undefined;
 
   const onWorkerMessage = (x:MessageEvent<ResponseData>) => {
     numberOfEvents.update((current) => {
@@ -24,32 +24,42 @@
     command: "start",
     pubkey: "d91191e30e00444b942c0e82cad470b32af171764c2275bee0bd99377efd4075",
   };
+
+  let connect: Command = {
+    command: "connect",
+  };
 </script>
 
-<button on:click={setup}>setup worker</button>
+<button on:click={setup}>Start Web Worker</button>
 {#if myWorker}
+<button disabled={$numberOfEvents.connected != 0}
+on:click={() => {
+  myWorker?.postMessage(connect);
+}}>{#if $numberOfEvents.connected == 0}ndk.connect{:else if $numberOfEvents.connected == 1 }connecting {:else}connected{/if}</button
+>
   <button
     on:click={() => {
-      myWorker.postMessage(start);
-    }}>Subscribe</button
+      myWorker?.postMessage(start);
+    }}>ndk.storeSubscribe</button
   >
   <button
     on:click={() => {
-      myWorker.postMessage({ command: "print" });
-    }}>Print</button
+      myWorker?.postMessage({ command: "stop" });
+    }}>sub.unsubscribe </button
   >
   <button
-    on:click={() => {
-      myWorker.postMessage({ command: "stop" });
-    }}>Stop</button
-  >
+  on:click={() => {
+    myWorker?.terminate();
+    myWorker = undefined;
+  }}>Exterminate Web Worker</button
+>
 {/if}
 <br />
-EVENTS: {$numberOfEvents.count}<br />
-CONNECTIONS:<br />
-{#each $numberOfEvents.connections as [relay, subs], i (relay)}{relay} {subs}<br /> {/each}
+{#if $numberOfEvents.connected == 2}Relays are connected{:else if $numberOfEvents.connected == 1}Trying to connect to relays{:else}Not connected to any relays{/if}
+<h4>UNIQUE EVENTS: {$numberOfEvents.count}</h4>
 
-<h1>Welcome to SvelteKit</h1>
-<p>
-  Visit <a href="https://kit.svelte.dev">kit.svelte.dev</a> to read the documentation
-</p>
+<h4>RELAY CONNECTIONS</h4>
+{#each $numberOfEvents.connections as [relay, subs], i (relay)}<h6>{relay} {subs}</h6> {/each}
+
+<h4>ERRORS</h4>
+{#each $numberOfEvents.errors as err}{err}<br />{/each}
