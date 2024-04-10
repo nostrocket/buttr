@@ -31,70 +31,66 @@ const _ndk = writable(
 const ndk = get(_ndk);
 let sub: NDKEventStore<ExtendedBaseType<NDKEvent>> | undefined = undefined;
 
-const set = new Set();
+const set = new Set<string>();
 let responseStore = writable(new ResponseData());
 responseStore.subscribe((response) => {
-    postMessage(response);
-  });
-
-let connected = false;
+  postMessage(response);
+});
 
 let start = (pubkey: string) => {
-if (!connected) {
-    responseStore.update(current=>{
-        current.errors.push(new Error("not connected!"))
-        return current
-    })
-}
-  sub = ndk.storeSubscribe({ authors: [pubkey] }, { subId: "kind-1" });
+  if (!get(responseStore).connected) {
+    responseStore.update((current) => {
+      current.errors.push(new Error("not connected!"));
+      return current;
+    });
+  }
+  sub = ndk.storeSubscribe({ authors: [pubkey] }, { subId: "kind-1" }); //authors: [pubkey]
   sub.subscribe((x) => {
     for (let y of x) {
       if (!set.has(y.id)) {
         set.add(y.id);
-      }
+        }
     }
     responseStore.update((current) => {
-      current.count = set.size;
+        current.rawCount = x.length
+        current.eventIds = set
+      if (sub?.subscription) {
+        for (let [s, relay] of sub.subscription.pool.relays) {
+          current.connections.set(s, relay.activeSubscriptions().size);
+        }
+      } else {
+        current.connections = new Map();
+      }
       return current;
     });
-    if (sub) {
-      responseStore.update((current) => {
-        if (sub?.subscription) {
-          for (let [s, relay] of sub.subscription.pool.relays) {
-            current.connections.set(s, relay.activeSubscriptions().size);
-          }
-        } else {
-          current.connections = new Map();
-        }
-        return current;
-      });
-    }
   });
 };
 
 onmessage = (m: MessageEvent<Command>) => {
   if (m.data.command == "connect") {
     if (get(responseStore).connected == 0) {
-        responseStore.update(current=>{
-            current.connected = 1;
-            return current;
-        })
-        ndk.connect(5000).then(() => {
-            responseStore.update(current=>{
-                current.connected = 2;
-                return current;
-            })
+      responseStore.update((current) => {
+        current.connected = 1;
+        return current;
+      });
+      ndk.connect(5000).then(() => {
+        responseStore.update((current) => {
+          current.connected = 2;
+          return current;
         });
+      });
     } else {
-        responseStore.update(current=>{
-            current.errors.push(Error("already connected!"))
-            return current
-        })
+      responseStore.update((current) => {
+        current.errors.push(Error("already connected!"));
+        return current;
+      });
     }
   }
 
   if (m.data.command == "start") {
-    if (m.data.pubkey) {start(m.data.pubkey)}
+    if (m.data.pubkey) {
+      start(m.data.pubkey);
+    }
   }
   if (m.data.command == "stop") {
     if (sub) {

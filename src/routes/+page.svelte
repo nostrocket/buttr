@@ -2,11 +2,11 @@
   import { writable } from "svelte/store";
   import { ResponseData, type Command } from "./worker.types";
 
-  const numberOfEvents = writable(new ResponseData());
+  const responseFromWorker = writable(new ResponseData());
   let myWorker: Worker | undefined = undefined;
 
   const onWorkerMessage = (x:MessageEvent<ResponseData>) => {
-    numberOfEvents.update((current) => {
+    responseFromWorker.update((current) => {
       current = x.data;
       return current;
     });
@@ -32,10 +32,10 @@
 
 <button on:click={setup}>Start Web Worker</button>
 {#if myWorker}
-<button disabled={$numberOfEvents.connected != 0}
+<button disabled={$responseFromWorker.connected != 0}
 on:click={() => {
   myWorker?.postMessage(connect);
-}}>{#if $numberOfEvents.connected == 0}ndk.connect{:else if $numberOfEvents.connected == 1 }connecting {:else}connected{/if}</button
+}}>{#if $responseFromWorker.connected == 0}ndk.connect{:else if $responseFromWorker.connected == 1 }connecting {:else}connected{/if}</button
 >
   <button
     on:click={() => {
@@ -55,11 +55,12 @@ on:click={() => {
 >
 {/if}
 <br />
-{#if $numberOfEvents.connected == 2}Relays are connected{:else if $numberOfEvents.connected == 1}Trying to connect to relays{:else}Not connected to any relays{/if}
-<h4>UNIQUE EVENTS: {$numberOfEvents.count}</h4>
+{#if $responseFromWorker.connected == 2}Relays are connected{:else if $responseFromWorker.connected == 1}Trying to connect to relays{:else}Not connected to any relays{/if}
+<h4>Total events from all relays: {$responseFromWorker.rawCount}</h4>
+<h4>UNIQUE EVENTS: {$responseFromWorker.eventIds.size}</h4>
 
 <h4>RELAY CONNECTIONS</h4>
-{#each $numberOfEvents.connections as [relay, subs], i (relay)}<h6>{relay} {subs}</h6> {/each}
+{#each $responseFromWorker.connections as [relay, subs], i (relay)}<h6>{relay} {subs}</h6> {/each}
 
 <h4>ERRORS</h4>
-{#each $numberOfEvents.errors as err}{err}<br />{/each}
+{#each $responseFromWorker.errors as err}{err}<br />{/each}
