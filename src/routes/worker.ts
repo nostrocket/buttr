@@ -32,6 +32,7 @@ const ndk = get(_ndk);
 let sub: NDKEventStore<ExtendedBaseType<NDKEvent>> | undefined = undefined;
 
 const responseData = new ResponseData();
+const workerEventMap = new Map<string, NDKEvent>();
 
 let responseStore = writable(responseData);
 responseStore.subscribe((response) => {
@@ -50,9 +51,10 @@ let start = (pubkey: string) => {
     sub = ndk.storeSubscribe({ authors: [pubkey] }, { subId: "kind-1" });
     sub.subscribe((x) => {
       for (let y of x) {
-        if (!responseData.events.has(y.id)) {
-          responseData.events.set(y.id, y.rawEvent());
+        if (!workerEventMap.has(y.id)) {
+          workerEventMap.set(y.id, y);
         }
+        responseData.PushEvent(y.rawEvent())
       }
       responseStore.update((current) => {
         current.rawCount = x.length;

@@ -68,10 +68,14 @@ on:click={() => {
 {#if $responseFromWorker.connected == 2}Relays are connected{:else if $responseFromWorker.connected == 1}Trying to connect to relays{:else}Not connected to any relays{/if}
 <h4>Total events from all relays: {$responseFromWorker.rawCount}</h4>
 <h4>UNIQUE EVENTS: {$responseFromWorker.events.size}</h4>
-<h4>UNIQUE MAP: {$responseFromWorker.events.size}</h4>
+
+<h4>ROOT EVENTS: {$responseFromWorker.rootEvents.size}</h4>
 
 <h4>RELAY CONNECTIONS</h4>
 {#each $responseFromWorker.connections as [relay, subs], i (relay)}<h6>{relay} {subs}</h6> {/each}
+
+<h4>EVENT KINDS</h4>
+{#each $responseFromWorker.kinds as [kind, count]}KIND {kind}: {count}<br />{/each}
 
 <h4>ERRORS</h4>
 {#each $responseFromWorker.errors as err}{err}<br />{/each}
