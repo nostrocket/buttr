@@ -13,3 +13,5 @@ export function npubToHex(npub: string): string {
   }
   return hex;
 }
+
+

@@ -23,7 +23,9 @@ export class ResponseData {
   events: Map<string, NostrEvent>;
   kinds: Map<number, number>;
   rootEvents: RecursiveEventMap;
+  directFollows: Set<string>;
   constructor() {
+    this.directFollows = new Set()
     this.connections = new Map();
     this.errors = [];
     this.events = new Map();

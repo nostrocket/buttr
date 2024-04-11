@@ -33,6 +33,9 @@ let sub: NDKEventStore<ExtendedBaseType<NDKEvent>> | undefined = undefined;
 
 const responseData = new ResponseData();
 const workerEventMap = new Map<string, NDKEvent>();
+const mostRecentReplaceableEvents: Map<string, NDKEvent> = new Map();
+const replaceableKinds = [0, 3];
+const processedIdForKind: Record<number, string> = {};
 
 let responseStore = writable(responseData);
 responseStore.subscribe((response) => {
@@ -48,13 +51,27 @@ let start = (pubkey: string) => {
     return;
   }
   if (!sub) {
-    sub = ndk.storeSubscribe({ authors: [pubkey] }, { subId: "kind-1" });
+    sub = ndk.storeSubscribe(
+      { kinds: [0, 1, 3, 7], authors: [pubkey] },
+      { subId: "34545" }
+    );
     sub.subscribe((x) => {
       for (let y of x) {
         if (!workerEventMap.has(y.id)) {
           workerEventMap.set(y.id, y);
         }
-        responseData.PushEvent(y.rawEvent())
+        let shouldPush = true;
+        if (replaceableKinds.includes(y.kind!)) {
+          let existing = mostRecentReplaceableEvents.get(y.deduplicationKey());
+          if (existing && y.created_at! < existing.created_at!) {
+            shouldPush = false;
+          } else {
+            mostRecentReplaceableEvents.set(y.deduplicationKey(), y);
+          }
+        }
+        if (shouldPush) {
+          responseData.PushEvent(y.rawEvent());
+        }
       }
       responseStore.update((current) => {
         current.rawCount = x.length;
@@ -69,15 +86,15 @@ let start = (pubkey: string) => {
       });
     });
   } else {
-    let newFilters: NDKFilter[] = [];
-    if (sub.filters) {
-      newFilters.push(...sub.filters);
-    }
-    newFilters.push({ authors: [pubkey] });
-    sub.changeFilters(newFilters);
-    console.log(sub.filters);
-    sub.unsubscribe();
-    sub.startSubscription();
+    // let newFilters: NDKFilter[] = [];
+    // if (sub.filters) {
+    //   newFilters.push(...sub.filters);
+    // }
+    // newFilters.push({kinds:[1, 6, 7, 3], authors: [pubkey] });
+    // sub.changeFilters(newFilters);
+    // console.log(sub.filters);
+    // sub.unsubscribe();
+    // sub.startSubscription();
   }
 };
 
