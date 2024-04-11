@@ -26,6 +26,7 @@
 		"@nostr-dev-kit/ndk-cache-dexie": "^2.3.1",
 		"@nostr-dev-kit/ndk-svelte": "^2.2.12",
 		"@nostr-dev-kit/ndk-svelte-components": "^2.2.13",
+		"@sveltejs/adapter-static": "^3.0.1",
 		"threads": "^1.7.0"
 	}
 }
