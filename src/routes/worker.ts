@@ -4,7 +4,7 @@ import NDKSvelte, {
   type NDKEventStore,
 } from "@nostr-dev-kit/ndk-svelte";
 import { get, writable } from "svelte/store";
-import { ResponseData, type Command } from "./worker.types";
+import { EventTreeItem, ResponseData, type Command, type RecursiveEventMap } from "./worker.types";
 import NDKCacheAdapterDexie from "@nostr-dev-kit/ndk-cache-dexie";
 
 const _ndk = writable(
@@ -86,15 +86,15 @@ let start = (pubkey: string) => {
       });
     });
   } else {
-    // let newFilters: NDKFilter[] = [];
-    // if (sub.filters) {
-    //   newFilters.push(...sub.filters);
-    // }
-    // newFilters.push({kinds:[1, 6, 7, 3], authors: [pubkey] });
-    // sub.changeFilters(newFilters);
-    // console.log(sub.filters);
-    // sub.unsubscribe();
-    // sub.startSubscription();
+    let newFilters: NDKFilter[] = [];
+    if (sub.filters) {
+      newFilters.push(...sub.filters);
+    }
+    newFilters.push({kinds:[0, 1, 3, 7], authors: [pubkey] });
+    sub.changeFilters(newFilters);
+    console.log(sub.filters);
+    sub.unsubscribe();
+    sub.startSubscription();
   }
 };
 
@@ -131,10 +131,47 @@ onmessage = (m: MessageEvent<Command>) => {
   }
 
   if (m.data.command == "print") {
-    if (sub) {
-      for (let [s, relay] of sub.subscription!.pool.relays) {
-        console.log(s, relay.activeSubscriptions().size);
-      }
-    }
+    updateEventMap()
   }
 };
+
+
+
+function updateEventMap() {
+let m:RecursiveEventMap = new Map();
+    for (let id of responseData.rootEvents) {
+      m.set(id, new EventTreeItem(workerEventMap.get(id)!.rawEvent()));
+    }
+    m = iterate(m)
+    for(let [_, evt] of m) {
+        if (evt.children.size > 0) {
+            for (let [_, evti] of evt.children) {
+                if (evti.children.size > 0) {
+                    console.log(evt)
+                }
+            }
+        }
+    }
+}
+
+
+
+function iterate(
+    m: Map<string, EventTreeItem>,
+  ): Map<string, EventTreeItem> {
+    for (let [id, treeItem] of m) {
+      let children:Map<string, EventTreeItem> = new Map()
+      let _children = responseData.etags.get(treeItem.event.id!)
+      if (_children) {
+        for (let eventID of _children) {
+          let _child_event = responseData.events.get(eventID)
+          if (_child_event) {
+            children.set(eventID, new EventTreeItem(_child_event))
+          }
+        }
+      }
+      treeItem.children = iterate(children)
+      m.set(id, treeItem)
+    }
+    return m
+  }

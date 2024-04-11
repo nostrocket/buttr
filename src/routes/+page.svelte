@@ -59,6 +59,11 @@ on:click={() => {
   >
   <button
   on:click={() => {
+    myWorker?.postMessage({ command: "print" });
+  }}>print </button
+>
+  <button
+  on:click={() => {
     myWorker?.terminate();
     myWorker = undefined;
   }}>Exterminate Web Worker</button
@@ -69,7 +74,11 @@ on:click={() => {
 <h4>Total events from all relays: {$responseFromWorker.rawCount}</h4>
 <h4>UNIQUE EVENTS: {$responseFromWorker.events.size}</h4>
 
-<h4>ROOT EVENTS: {$responseFromWorker.rootEvents.size}</h4>
+<h4>ROOT EVENT COUNT: {$responseFromWorker.rootEvents.size}</h4>
+
+<h4>ROOT EVENTS WITH MENTIONS</h4>
+{#each $responseFromWorker.rootEvents as id, i (id)}{/each}
+
 
 <h4>RELAY CONNECTIONS</h4>
 {#each $responseFromWorker.connections as [relay, subs], i (relay)}<h6>{relay} {subs}</h6> {/each}
