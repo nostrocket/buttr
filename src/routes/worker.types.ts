@@ -1,4 +1,4 @@
-import { NDKEvent, type NostrEvent } from "@nostr-dev-kit/ndk";
+import { NDKEvent, type NDKTag, type NostrEvent } from "@nostr-dev-kit/ndk";
 
 export class Command {
   command: "start" | "stop" | "connect" | "print";
@@ -25,12 +25,13 @@ export class ResponseData {
   kinds: Map<number, number>;
   rootEvents: Set<string>;
   recursiveEvents: RecursiveEventMap;
-  directFollows: Set<string>;
-
-  constructor() {
+  followLists: Map<string, Set<string>>;
+  masterPubkey: string;
+  constructor(pubkey:string) {
+    this.masterPubkey = pubkey;
     this.recursiveEvents = new Map()
     this.etags = new Map();
-    this.directFollows = new Set();
+    this.followLists = new Map();
     this.connections = new Map();
     this.errors = [];
     this.events = new Map();
@@ -49,7 +50,9 @@ export class ResponseData {
         existing++;
         this.kinds.set(ev.kind!, existing);
       }
-
+      if (ev.kind == 3) {
+       this.followLists.set(ev.pubkey, new Set(ev.tags.filter((t: NDKTag) => t[0] == 'p').map((t: NDKTag) => t[1]))) 
+      }
       if (ev.kind == 1 || ev.kind == 7) {
         let e = new NDKEvent(undefined, ev);
         let found = false;
@@ -66,37 +69,10 @@ export class ResponseData {
           if (!t.includes("mention")) {
             found = true;
           }
-          // if (t.includes("mention")) {
-          //   if (t[1].length == 64) {
-          //     let _existing = this.rootEvents.get(t[1])
-          //     if (!_existing) {_existing = new EventTreeItem(t[1])}
-          //       _existing.mentions.set(e.id, new EventTreeItem(e.id, e.rawEvent()))
-          //       this.rootEvents.set(t[1], _existing)
-          //   }
-          // }
-          // if (t.includes("reply")) {
-          //   if (t[1].length == 64) {
-          //     let _existing = this.rootEvents.get(t[1])
-          //     if (!_existing) {_existing = new EventTreeItem(t[1])}
-          //       _existing.directReplies.set(e.id, new EventTreeItem(e.id, e.rawEvent()))
-          //       this.rootEvents.set(t[1], _existing)
-          //   }
-          // }
         }
         if (!found) {
           this.rootEvents.add(ev.id!);
-          // let existing = this.rootEvents.get(ev.id!);
-          // if (!existing) {
-          //   existing = new EventTreeItem(ev);
-          // }
-          // if (!existing.event) {
-          //   existing.event = ev;
-          // }
-          // this.rootEvents.set(ev.id!, existing);
         }
-        // if (found) {
-        //   //todo: populate event tree data
-        // }
       }
     }
   }
@@ -150,3 +126,4 @@ export class EventTreeItem {
     this.children = new Map();
   }
 }
+
