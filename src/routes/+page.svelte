@@ -2,6 +2,7 @@
   import { writable } from "svelte/store";
   import { ResponseData, Command } from "./worker.types";
   import { npubToHex } from "./helpers";
+  import Recursve from "./Recursve.svelte";
 
   const responseFromWorker = writable(new ResponseData());
   let myWorker: Worker | undefined = undefined;
@@ -88,3 +89,6 @@ on:click={() => {
 
 <h4>ERRORS</h4>
 {#each $responseFromWorker.errors as err}{err}<br />{/each}
+
+<h4>recursive</h4>
+<Recursve data={$responseFromWorker.recursiveEvents} />
