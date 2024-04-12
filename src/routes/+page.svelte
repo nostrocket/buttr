@@ -45,7 +45,6 @@
     setup();
   });
 </script>
-
 {#if myWorker}
   pubkey:<input bind:value={rootPubkey} size={72} maxlength={64} />
   <button
@@ -94,7 +93,15 @@
   <h4>EVENT KINDS</h4>
   {#each $responseFromWorker.kinds as [kind, count]}KIND {kind}: {count}<br
     />{/each}
-  <h4>FOLLOW LIST LENGTH</h4>
+
+<h4>MASTER PUBKEY: {$responseFromWorker.masterPubkey}: {$responseFromWorker.followLists.get($responseFromWorker.masterPubkey)?.size}</h4>
+
+<h4>MASTER PUBKEY FOLLOW LIST LENGTHS</h4>
+<!-- {#each $responseFromWorker.followLists as [pubkey, set], i (pubkey)}<p>
+  {#if pubkey == $responseFromWorker.masterPubkey} {pubkey}: {set.size}{/if}
+  </p>{/each} -->
+
+  <h4>ALL FOLLOW LIST LENGTHS</h4>
   {#each $responseFromWorker.followLists as [pubkey, set], i (pubkey)}<p>
       {pubkey}: {set.size}
     </p>{/each}
@@ -102,6 +109,6 @@
   <h4>ERRORS</h4>
   {#each $responseFromWorker.errors as err}{err}<br />{/each}
 
-  <h4>recursive</h4>
-  <Recursve data={$responseFromWorker.recursiveEvents} />
+  <!-- <h4>recursive</h4>
+  <Recursve data={$responseFromWorker.recursiveEvents} /> -->
 {/if}

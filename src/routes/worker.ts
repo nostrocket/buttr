@@ -16,18 +16,18 @@ const _ndk = writable(
   new NDKSvelte({
     //cacheAdapter: new NDKCacheAdapterDexie({ dbName: "wiki" }),
     explicitRelayUrls: [
-    "wss://purplepag.es",
+      "wss://purplepag.es",
       "wss://relay.nostr.band",
-    //  "wss://nos.lol",
-    //   "wss://relay.wikifreedia.xyz",
-     "wss://relay.nostrocket.org",
-       "wss://search.nos.today",
-     "wss://relay.damus.io",
-    //   "wss://relay.nostr.bg",
-       "wss://relay.snort.social",
-    //   "wss://offchain.pub",
-       "wss://relay.primal.net",
-     // "wss://pyramid.fiatjaf.com",
+      //  "wss://nos.lol",
+      //   "wss://relay.wikifreedia.xyz",
+      "wss://relay.nostrocket.org",
+      "wss://search.nos.today",
+      "wss://relay.damus.io",
+      //   "wss://relay.nostr.bg",
+      "wss://relay.snort.social",
+      //   "wss://offchain.pub",
+      "wss://relay.primal.net",
+      // "wss://pyramid.fiatjaf.com",
     ],
     enableOutboxModel: false,
   })
@@ -63,24 +63,40 @@ function init(pubkey: string) {
       updateEventMap();
     });
 
-    let masterFollows = derived(responseStore, ($responseStore)=>{
-        return $responseStore.followLists.get($responseStore.masterPubkey)?.size
+    // let _masterFollows = writable(responseData.followLists.get(responseData.masterPubkey))
+    // let masterFollows = derived(_masterFollows, ($mfs)=>{
+    //   if ($mfs) {
+    //     return $mfs.size
+    //   } else {
+    //     return 0
+    //   }
+    // })
+
+    let masterFollows = derived(responseStore, ($responseStore) =>{
+      return $responseStore.followLists.get($responseStore.masterPubkey)?.size
     })
 
-    masterFollows.subscribe(()=>{
-        let follows = responseData?.followLists.get(responseData.masterPubkey)
-        if (follows) {
-            subscribe(responseData!.masterPubkey, [...follows])
-        }
-    })
+    masterFollows.subscribe(() => {
+      console.log(76)
+      let $responseStore = get(responseStore!);
+      let follows = $responseStore.followLists.get($responseStore.masterPubkey);
+      console.log(follows)
+      if (follows) {
+        console.log(79)
+        subscribe(responseData!.masterPubkey, [...follows]);
+      }
+    });
   }
 }
 
-let subscribe = (pubkey: string, pubkeys?:string[]) => {
-    if (pubkey.length != 64) {throw new Error("invalid pubkey")}
+let subscribe = (pubkey: string, pubkeys?: string[]) => {
+  if (pubkey.length != 64) {
+    throw new Error("invalid pubkey");
+  }
   if (!responseData) {
     init(pubkey);
   }
+  if (!responseData) {throw new Error("this should not happen")}
   if (connectionStatus != 2) {
     responseStore!.update((current) => {
       current.errors.push(new Error("not connected!"));
@@ -88,31 +104,32 @@ let subscribe = (pubkey: string, pubkeys?:string[]) => {
     });
     return;
   }
+  responseData.masterPubkey = pubkey
   if (!sub) {
     sub = ndk.storeSubscribe(
       { kinds: [0, 1, 3, 7], authors: [pubkey] },
-      { subId: "34545" }
+      { subId: "master" }
     );
-    sub.subscribe((x) => {
-      for (let y of x) {
-        if (!workerEventMap.has(y.id)) {
-          workerEventMap.set(y.id, y);
+    sub.subscribe((events) => {
+      for (let event of events) {
+        if (!workerEventMap.has(event.id)) {
+          workerEventMap.set(event.id, event);
         }
         let shouldPush = true;
-        if (replaceableKinds.includes(y.kind!)) {
-          let existing = mostRecentReplaceableEvents.get(y.deduplicationKey());
-          if (existing && y.created_at! < existing.created_at!) {
+        if (replaceableKinds.includes(event.kind!)) {
+          let existing = mostRecentReplaceableEvents.get(event.deduplicationKey());
+          if (existing && event.created_at! < existing.created_at!) {
             shouldPush = false;
           } else {
-            mostRecentReplaceableEvents.set(y.deduplicationKey(), y);
+            mostRecentReplaceableEvents.set(event.deduplicationKey(), event);
           }
         }
         if (shouldPush) {
-          responseData!.PushEvent(y.rawEvent());
+          responseData!.PushEvent(event.rawEvent());
         }
       }
       responseStore!.update((current) => {
-        current.rawCount = x.length;
+        current.rawCount = events.length;
         if (sub?.subscription) {
           for (let [s, relay] of sub.subscription.pool.relays) {
             current.connections.set(s, relay.activeSubscriptions().size);
@@ -125,26 +142,27 @@ let subscribe = (pubkey: string, pubkeys?:string[]) => {
     });
   } else {
     let newFilters: NDKFilter[] = [];
-    if (sub.filters) {
-      newFilters.push(...sub.filters);
-    }
-    newFilters.push({ kinds: [0, 1, 3, 7], authors: [pubkey] });
-    let authors = new Set<string>()
+    let authors = new Set<string>();
     if (pubkeys) {
-        authors = new Set<string>(pubkeys)
+      authors = new Set<string>(pubkeys);
     }
-    for (let fi of newFilters) {
+    authors.add(pubkey);
+    if (sub.filters) {
+      for (let fi of sub.filters) {
         if (fi.authors) {
-            for (let author of fi.authors) {
-                authors.add(author)
-            }
+          for (let author of fi.authors) {
+            authors.add(author);
+          }
         }
+      }
     }
     newFilters = [];
-    newFilters.push({ kinds: [0, 1, 3, 7], authors: [...authors] })
-    newFilters = [...new Set(newFilters)];
+    newFilters.push({ kinds: [3], authors: [pubkey] });
+    for (let author of authors) {
+      newFilters.push({ kinds: [0, 1, 3, 7], authors: [author] });
+    }
     sub.changeFilters(newFilters);
-    console.log(sub.filters, newFilters);
+    console.log(sub.filters)
     sub.unsubscribe();
     sub.startSubscription();
   }
@@ -160,23 +178,6 @@ onmessage = (m: MessageEvent<Command>) => {
         connectionStatus = 2;
       });
     }
-    // if (get(responseStore).connected == 0) {
-    //   responseStore.update((current) => {
-    //     current.connected = 1;
-    //     return current;
-    //   });
-    //   ndk.connect(5000).then(() => {
-    //     responseStore.update((current) => {
-    //       current.connected = 2;
-    //       return current;
-    //     });
-    //   });
-    // } else {
-    //   responseStore.update((current) => {
-    //     current.errors.push(Error("already connected!"));
-    //     return current;
-    //   });
-    // }
   }
 
   if (m.data.command == "start") {
